@@ -4,6 +4,7 @@
  - Automatically create clickable links in DMs; just search messages for `http[s]://` and embed them in the proper HTML tags.
  - Automatically create links to accounts mentioned, e.g. `@newyorkermag`.
  - Make timestamps nicer looking.
+ - Use locally stored DM files if they exist, to save network usage, and to increase image quality
 
 ## Support the following message types in DMs:
 

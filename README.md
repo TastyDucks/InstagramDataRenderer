@@ -2,10 +2,10 @@
 A tool to render the data downloads provided by Instagram into user-friendly HTML documents for archival purposes.
 
 Requirements:
- - [Python 3.6+](https://www.python.org/downloads/)
+ - [Python 3.7+](https://www.python.org/downloads/) (Needed for ordered dictionaries.)
  - [Requests](https://2.python-requests.org/en/master/)
 
-Usage: `python render.py FILENAME`
+Usage: `python render.py ArchivePartOne ArchivePartTwo ArchivePartThree <--no-media>` (`--no-media` is optional. If used, only plaintext messages are rendered.)
 
 The main file to open in your browser is the index, `index.html`.
 
