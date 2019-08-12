@@ -10,6 +10,7 @@ import base64
 import json
 import os
 from shutil import rmtree
+from signal import signal, SIGINT
 import sys
 import time
 import zipfile
@@ -34,7 +35,7 @@ def Download(URL):
     try:
         Response = requests.get(URL, stream=True)
     except:
-        Response = None # This probably will occur when the URL is listed as "Media share unavaliable"
+        Response = None # This probably will occur when the URL is listed as "Media share unavailable"
     if not Response:
         return False, templates.Image404 # If any HTTP error occurs we just use the 404 image.
     Length = Response.headers.get("content-length")
@@ -46,6 +47,17 @@ def Download(URL):
         Done = int(100 * DL / Length)
         # print(f"{DL} / {Length} KB: {Done}%", end="\r")
     return True, str(base64.b64encode(Content).decode("utf8"))
+
+def SIGINTHandler(signal_received, frame):
+    Log("SIGINT detected.", 1)
+    Exit()
+
+def Exit():
+    """
+    Graceful exit.
+    """
+    Log("Exited.", 0)
+    sys.exit()
 
 def Log(Message, LogLevel=0):
     """
@@ -73,9 +85,11 @@ def Log(Message, LogLevel=0):
 # Body.
 #
 
+signal(SIGINT, SIGINTHandler) # Register handler for ctrl+c
+
 if len(sys.argv) < 4:
     Log("Not enough archive files specified. Syntax is \"python render.py ARCHIVEPART1 ARCHIVEPART2 ARCHIVEPART3\".", 1)
-    sys.exit()
+    Exit()
 
 StartTime = time.perf_counter()
 
