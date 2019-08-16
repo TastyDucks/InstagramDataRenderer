@@ -14,7 +14,7 @@ The font used is [Montserrat](https://fonts.google.com/specimen/Montserrat), as 
 
 ## Troubleshooting
 
-### Warning `Unable to download resource` for a large volume of messages when rendering direct messages
+ -  Warning `Unable to download resource` for a large volume of messages when rendering direct messages
 
 Consider downloading a new copy of your data. Instagram's content URLs use an internal URL signature which causes them to expire after some indeterminate amount of time, so it is important to render your data as soon as you have downloaded it.
 
