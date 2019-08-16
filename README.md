@@ -5,7 +5,7 @@ Requirements:
  - [Python 3.7+](https://www.python.org/downloads/) (Needed for ordered dictionaries.)
  - [Requests](https://2.python-requests.org/en/master/)
 
-Usage: `python render.py ArchivePartOne ArchivePartTwo ArchivePartThree <--no-media, -n>`
+Usage: `python render.py Archive [Archive2, Archive3...] <--no-media, -n>`
  - `--no-media`, `-n`: Only text is rendered in conversations / direct messages. Useful if you have friends that spam *way* too many memes or images. Provides a significant speed-up to the overall process.
 
 The main file to open in your browser is the index, `index.html`.

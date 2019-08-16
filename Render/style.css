@@ -37,25 +37,33 @@ h1, h2, h3, h4, h5, h6
 {
     border-style: solid;
     border-width: 0.05em;
+    margin: auto;
     max-width: 50%;
 }
 .mediapost
 {
     display: block;
-    max-width: 100%;
     margin: auto;
+    max-width: 100%;
 }
 .mediastory
 {
     display: block;
-    max-width: 100%;
     margin: auto;
+    max-width: 100%;
 }
 .post
 {
     border-style: solid;
     border-width: 0.075em;
     margin: auto;
+    max-width: 50%;
+    padding: 0.5em 0.5em;
+}
+.postshared
+{
+    border-style: solid;
+    border-width: 0.075em;
     max-width: 50%;
     padding: 0.5em 0.5em;
 }

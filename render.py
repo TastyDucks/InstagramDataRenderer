@@ -1,5 +1,3 @@
-# Created by TastyDucks, 2019-03-23
-
 #
 # Imports.
 #
@@ -61,17 +59,19 @@ def Exit():
     """
     Exit.
     """
-    Log("Exited.")
+    Log("Stopped.")
     #sys.exit()
     os._exit(0) # TODO: Might be a bad way to exit. Consider replacing.
 
-def LinkifyText(Text):
+def FormatText(Text):
     """
-    Attempt to add HTML links to any Instagram accounts or URLs in a text string.
+    Adds HTML links to any Instagram accounts, hashtags, or URLs in a text string. Also replaces newlines with "<br>".
     """
     Text = str(Text)
     Text = re.sub(r"https?:\/\/\S+", lambda match: '<a href=\"{0}\">{0}</a>'.format(match.group()), Text) # Add HTML links to web addresses.
-    Text = re.sub(r"@\w+", lambda match: '<a href=\"https://www.instagram.com/{0}\">@{0}</a>'.format(match.group()[1:]), Text) # Add HTML links to user accounts.
+    Text = re.sub(r"@\S+", lambda match: '<a href=\"https://www.instagram.com/{0}\">@{0}</a>'.format(match.group()[1:]), Text) # Add HTML links to user accounts.
+    Text = re.sub(r"#\S+", lambda match: '<a href=\"https://www.instagram.com/explore/tags/{0}">#{0}</a>'.format(match.group()[1:]), Text) # Add HTML links to hashtags.
+    Text = re.sub("\\n", "<br>", Text) # Replace "\n" with "<br>".
     return Text
 
 def Log(Message, LogLevel=0):
@@ -105,43 +105,50 @@ def SIGINTHandler(signal_received, frame):
 
 signal(SIGINT, SIGINTHandler) # Register handler for ctrl+c.
 
-if len(sys.argv) < 4:
-    Log("Less than 3 archive files passed.", 2)
-    print("Syntax is \"python render.py ArchivePartOne ArchivePartTwo ArchivePartThree <--no-media, -n>\".")
-    Exit()
-
 StartTime = time.perf_counter()
+
+Log("Started.")
+
+# Parse arguments.
 
 if sys.argv[-1] in ("--no-media", "-n"):
     NoMedia = True
     Log("Running in NoMedia mode. Rendered output for direct messages will be text only.", 1)
+    Archives = sys.argv[1:-1]
 else:
     NoMedia = False
+    Archives = sys.argv[1:]
+
+if len(Archives) < 1:
+    Log("No archive files passed.", 2)
+    Exit()
 
 # Extract archive.
 
 try:
-    Path = sys.argv[1]
-    with zipfile.ZipFile(Path, "r") as Zip: # Part one: Basic data.
+    Path = Archives[0]
+    with zipfile.ZipFile(Path, "r") as Zip: # Basic data and user media.
         Zip.extractall(".Archive")
-    Path = sys.argv[2]
-    with zipfile.ZipFile(Path, "r") as Zip: # Part two: User media.
-        Zip.extractall(".Archive")
-    with open(".Archive/media.json", "r") as File:
-        Media1 = json.load(File)
-    Path = sys.argv[3]
-    with zipfile.ZipFile(Path, "r") as Zip: # Part three: User media.
-        Zip.extractall(".Archive")
-    with open(".Archive/media.json", "r") as File:
-        Media2 = json.load(File)
-    Media = {**Media1, **Media2} # Concatenate media.json files.
-    with open(".Archive/media.json", "w+") as File:
-        json.dump(Media, File)
+    if len(Archives) > 1: # 2 archives.
+        Path = sys.argv[2]
+        with zipfile.ZipFile(Path, "r") as Zip: # Part two of ?: User media.
+            Zip.extractall(".Archive")
+    if len(Archives) > 2: # 3 archives.
+        with open(".Archive/media.json", "r") as File:
+            Media1 = json.load(File)
+        Path = sys.argv[3]
+        with zipfile.ZipFile(Path, "r") as Zip: # Part three of ?: User media.
+            Zip.extractall(".Archive")
+        with open(".Archive/media.json", "r") as File:
+            Media2 = json.load(File)
+        Media = {**Media1, **Media2} # Concatenate media.json files.
+        with open(".Archive/media.json", "w+") as File:
+            json.dump(Media, File)
 except FileNotFoundError:
     Log(f"File not found: \"{Path}\"", 2)
     Exit()
 
-Log("Archive extracted.")
+Log("Archive(s) extracted.")
 
 # Create output directory.
 
@@ -209,15 +216,18 @@ for Conversation in Direct:
             Likes = templates.DirectMessageLikes.format(Usernames=Usernames)
         else:
             Likes = ""
-        if "text" in Message: # Process text content.
-            Content = LinkifyText(Message["text"])
+        if "story_share" in Message: # Process shared stories.
+            Content = FormatText(Message["story_share"])
+            DM = templates.DirectMessageStory.format(Timestamp=Timestamp,Username=Username,Content=Content,Likes=Likes)
+            Content = FormatText(Message["text"])
+            if Content:
+                DM = DM + "\r\n" + templates.DirectMessage.format(Timestamp=Timestamp,Username=Username,Content=Content,Likes=Likes)
+        elif "text" in Message: # Process text content. (This is after "story_share" because that can also have a "text" component.)
+            Content = FormatText(Message["text"])
             DM = templates.DirectMessage.format(Timestamp=Timestamp,Username=Username,Content=Content,Likes=Likes)
         elif "heart" in Message: # Process "heart" content.
             Content = Message["heart"]
             DM = templates.DirectMessage.format(Timestamp=Timestamp,Username=Username,Content=Content,Likes=Likes)
-        elif "story_share" in Message: # Process shared stories
-            Content = LinkifyText(Message["story_share"])
-            DM = templates.DirectMessageStory.format(Timestamp=Timestamp,Username=Username,Content=Content,Likes=Likes)
         elif "media" in Message: # Process media content. # TODO: Consolidate this code. Nearly the same thing is duplicated three times here.
             if not NoMedia:
                 URL = Message["media"]
@@ -260,7 +270,7 @@ for Conversation in Direct:
             if not NoMedia:
                 URL = Message["media_share_url"]
                 PostOwner = Message["media_owner"]
-                Caption = LinkifyText(Message["media_share_caption"])
+                Caption = FormatText(Message["media_share_caption"])
                 Reply, Content = Download(URL)
                 if Reply:
                     if ".jpg" in URL:
@@ -281,9 +291,8 @@ for Conversation in Direct:
             Content = Message["video_call_action"]
             DM = templates.DirectMessageVideoCallAction.format(Timestamp=Timestamp,Username=Username,Content=Content)
         elif "profile_share_username" in Message: # Process shared profiles.
-            ProfileUsername = Message["profile_share_username"] # Formal username.
-            ProfileShareName = Message["profile_share_name"]
-            DM = templates.DirectMessageProfile.format(Timestamp=Timestamp,Username=Username,ProfileUsername=ProfileUsername,ProfileShareName=ProfileShareName)
+            ProfileUsername = Message["profile_share_username"]
+            DM = templates.DirectMessageProfile.format(Timestamp=Timestamp,Username=Username,ProfileUsername=ProfileUsername)
         elif "action" in Message: # Process group actions, including changing the name of the group.
             Content = Message["action"]
             if " named the group " in Content: # Extract the groups name, if one exists.
@@ -293,7 +302,7 @@ for Conversation in Direct:
             if not NoMedia:
                 Content = "UNSUPPORTED MESSAGE FORMAT: VOICE MEDIA"
                 DM = templates.DirectMessage.format(Timestamp=Timestamp,Username=Username,Content=Content,Likes=Likes)
-                Log(f"Unsupported message format: voice media: {OriginalTimestamp}", 2)
+                Log(f"Unsupported message format: voice media: {OriginalTimestamp}", 1)
         elif "animated_media_images" in Message: # Process GIPHY media.
             if not NoMedia:
                 Reply, Content = Download(Message["animated_media_images"]["original"]["mp4"])
@@ -341,7 +350,6 @@ for Conversation in Conversations:
         ConversationName = Conversations[Conversation]
     else:
         ConversationName = ""
-    Users = "Conversation" # TODO: Get actual user list or whatever.
     Entry = templates.ConversationIndexEntry.format(Conversation=Conversation,ConversationName=ConversationName)
     ConversationIndex += Entry
 
@@ -366,7 +374,7 @@ for Post in Posts:
     CurrentPost += 1
     Done = int(100 * CurrentPost / NumberOfPosts)
     print(f"Rendered {CurrentPost} / {NumberOfPosts} posts: {Done}%", end='\r')
-    Caption = LinkifyText(Post["caption"])
+    Caption = FormatText(Post["caption"])
     Path = Post["path"]
     OriginalTimestamp = Post["taken_at"]
     Timestamp = OriginalTimestamp.replace("T", " ") # Replace the "T" in the timestamp with a space.
@@ -393,7 +401,7 @@ for Post in Posts:
     RenderedPosts += Post + "\r\n"
 
 PrologueHTML = templates.PrologueHTML.format(Time=CurrentTime())
-PostsBody = templates.PostsBody.format(PrologueHTML=PrologueHTML,Posts=RenderedPosts)
+PostsBody = templates.PostsBody.format(PrologueHTML=PrologueHTML,NumberOfPosts=NumberOfPosts,Posts=RenderedPosts)
 
 with open("Render/posts.html", "w+", encoding="utf8") as File:
     File.write(PostsBody)
@@ -404,7 +412,7 @@ Log("Posts rendered.")
 
 with open(".Archive/profile.json", "r") as File:
     Profile = json.load(File)
-Biography, JoinDate, Email, Gender, PrivateAccount, URL, Username, BusinessCategory, BusinessEmail = LinkifyText(Profile["biography"]), Profile["date_joined"].replace("T", " "), Profile["email"], str(Profile["gender"]), Profile["private_account"], Profile["profile_pic_url"], Profile["username"], Profile["business_category"], Profile["business_email"]
+Biography, JoinDate, Email, Gender, PrivateAccount, URL, Username, BusinessCategory, BusinessEmail = FormatText(Profile["biography"]), Profile["date_joined"].replace("T", " "), Profile["email"], str(Profile["gender"]), Profile["private_account"], Profile["profile_pic_url"], Profile["username"], Profile["business_category"], Profile["business_email"]
 Reply, Content = Download(URL)
 if not Reply:
     Log("Unable to download resource: profile_pic_url", 1)
@@ -424,11 +432,12 @@ Log("Skipping saved posts: No context.", 1)  # TODO: This might be possible with
 RenderedStories = ""
 NumberOfStories = len(Stories)
 CurrentStory = 0
+Stories.reverse() # We reverse this list because we want the oldest stories to come first on the page.
 for Story in Stories:
     CurrentStory += 1
     Done = int(100 * CurrentStory / NumberOfStories)
     print(f"Rendered {CurrentStory} / {NumberOfStories} stories: {Done}%", end='\r')
-    Caption = LinkifyText(Story["caption"])
+    Caption = FormatText(Story["caption"])
     Path = Story["path"]
     OriginalTimestamp = Story["taken_at"]
     Timestamp = OriginalTimestamp.replace("T", " ")
@@ -444,7 +453,7 @@ for Story in Stories:
     RenderedStories += Story + "\r\n"
 
 PrologueHTML = templates.PrologueHTML.format(Time=CurrentTime())
-StoriesBody = templates.StoriesBody.format(PrologueHTML=PrologueHTML,Stories=RenderedStories)
+StoriesBody = templates.StoriesBody.format(PrologueHTML=PrologueHTML,NumberOfStories=NumberOfStories,Stories=RenderedStories)
 
 with open("Render/stories.html", "w+", encoding="utf8") as File:
     File.write(StoriesBody)
@@ -470,3 +479,4 @@ Log("Temporary files deleted.")
 
 StopTime = time.perf_counter()
 Log(f"Rendering completed in ~{round(StopTime - StartTime, 2)} seconds.")
+Exit()
